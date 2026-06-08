@@ -1,0 +1,1288 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CODIC — Além da Superfície</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=DM+Sans:ital,wght@0,200;0,300;0,400;0,500;1,300&family=Dancing+Script:wght@600;700&display=swap" rel="stylesheet">
+<style>
+/* ════════════════════════════════════════
+   TOKENS
+════════════════════════════════════════ */
+:root {
+  --deep:       #040e1a;
+  --abyss:      #020910;
+  --mid:        #0D3B66;
+  --bright:     #1D6FA3;
+  --glow:       #4ab8f0;
+  --white:      #F2F2F2;
+  --gold:       #D4AF37;
+  --gold-glow:  rgba(212,175,55,0.4);
+  --gold-dim:   rgba(212,175,55,0.08);
+  --surface-h:  100vh;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;font-size:16px}
+body{
+  background:var(--deep);
+  color:var(--white);
+  font-family:'DM Sans',sans-serif;
+  font-weight:300;
+  overflow-x:hidden;
+  cursor:none;
+}
+
+/* ── custom cursor ── */
+.cursor{
+  position:fixed;width:10px;height:10px;border-radius:50%;
+  background:var(--gold);pointer-events:none;z-index:9999;
+  transform:translate(-50%,-50%);mix-blend-mode:screen;
+  transition:transform .1s ease,opacity .2s;
+}
+.cursor-ring{
+  position:fixed;width:36px;height:36px;border-radius:50%;
+  border:1px solid rgba(212,175,55,0.4);pointer-events:none;z-index:9998;
+  transform:translate(-50%,-50%);transition:all .25s ease;
+}
+body:hover .cursor{opacity:1}
+
+/* ── FIXED CANVAS ── */
+#bg-canvas{
+  position:fixed;inset:0;pointer-events:none;z-index:0;
+}
+
+/* ── DEPTH OVERLAY that darkens as you scroll ── */
+#depth-veil{
+  position:fixed;inset:0;pointer-events:none;z-index:1;
+  background:linear-gradient(180deg,transparent 0%,var(--abyss) 100%);
+  opacity:0;transition:opacity .05s linear;
+}
+
+section{position:relative;z-index:2}
+
+/* ════════════════════════════════════════
+   NAV
+════════════════════════════════════════ */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:200;
+  padding:20px 48px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+nav::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(4,14,26,0.7) 0%,transparent 100%);
+  backdrop-filter:blur(2px);
+  -webkit-backdrop-filter:blur(2px);
+}
+.nav-brand{
+  position:relative;z-index:1;
+  font-family:'Playfair Display',serif;
+  font-weight:900;font-size:17px;letter-spacing:4px;
+  color:var(--white);text-decoration:none;
+}
+.nav-brand span{color:var(--gold)}
+.nav-links{
+  position:relative;z-index:1;
+  display:flex;gap:32px;list-style:none;
+}
+.nav-links a{
+  font-size:10px;letter-spacing:3px;color:rgba(242,242,242,0.4);
+  text-decoration:none;text-transform:uppercase;
+  transition:color .2s;
+}
+.nav-links a:hover{color:var(--gold)}
+.nav-interact{
+  position:relative;z-index:1;
+  display:flex;align-items:center;gap:10px;
+}
+.nav-interact svg{width:32px;height:32px;opacity:.7;transition:opacity .2s}
+.nav-interact:hover svg{opacity:1}
+.nav-interact-text{font-size:10px;letter-spacing:1.5px;color:rgba(242,242,242,0.35);line-height:1.3}
+@media(max-width:700px){.nav-links,.nav-interact-text{display:none};nav{padding:16px 24px}}
+
+/* ════════════════════════════════════════
+   HERO
+════════════════════════════════════════ */
+#hero{
+  min-height:100vh;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  text-align:center;padding:0 24px;
+  overflow:hidden;
+}
+
+/* Surface water shimmer at very top */
+.water-surface{
+  position:absolute;top:0;left:0;right:0;height:120px;
+  background:linear-gradient(180deg,
+    rgba(74,184,240,0.15) 0%,
+    transparent 100%);
+  z-index:3;
+}
+.water-surface::after{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,
+    transparent 0%,rgba(74,184,240,0.9) 20%,
+    rgba(212,175,55,0.5) 50%,
+    rgba(74,184,240,0.9) 80%,transparent 100%);
+  animation:wsurf 4s ease-in-out infinite;
+}
+@keyframes wsurf{0%,100%{opacity:.6;transform:scaleX(.95)}50%{opacity:1;transform:scaleX(1)}}
+
+/* The ICON — central symbol */
+.hero-icon{
+  position:relative;margin-bottom:36px;
+  opacity:0;animation:riseFade 1.2s cubic-bezier(.16,1,.3,1) forwards .2s;
+}
+.icon-svg{width:100px;height:100px;filter:drop-shadow(0 0 24px rgba(212,175,55,0.5))}
+.icon-svg .icon-pulse{
+  animation:iconPulse 3s ease-in-out infinite;
+  transform-origin:center;
+}
+@keyframes iconPulse{0%,100%{opacity:.7;transform:scale(1)}50%{opacity:1;transform:scale(1.04)}}
+
+/* Ring halos around icon */
+.halo{
+  position:absolute;top:50%;left:50%;border-radius:50%;
+  border:1px solid;transform:translate(-50%,-50%);
+  pointer-events:none;
+}
+.halo-1{width:130px;height:130px;border-color:rgba(212,175,55,0.25);animation:haloPulse 3s ease-in-out infinite}
+.halo-2{width:170px;height:170px;border-color:rgba(29,111,163,0.15);animation:haloPulse 3s ease-in-out infinite .8s}
+.halo-3{width:220px;height:220px;border-color:rgba(29,111,163,0.07);animation:haloPulse 3s ease-in-out infinite 1.4s}
+@keyframes haloPulse{0%,100%{transform:translate(-50%,-50%) scale(1);opacity:.7}50%{transform:translate(-50%,-50%) scale(1.06);opacity:1}}
+
+/* Hero text stack */
+.hero-kicker{
+  font-size:11px;letter-spacing:6px;color:rgba(212,175,55,0.7);
+  text-transform:uppercase;
+  opacity:0;animation:riseFade .8s ease forwards .7s;
+  margin-bottom:20px;
+}
+.hero-title{
+  font-family:'Playfair Display',serif;
+  font-weight:900;font-size:clamp(64px,12vw,120px);
+  line-height:.9;letter-spacing:-2px;color:var(--white);
+  opacity:0;animation:riseFade 1s cubic-bezier(.16,1,.3,1) forwards .9s;
+  margin-bottom:8px;
+  text-shadow:0 0 80px rgba(29,111,163,0.4);
+}
+.hero-script{
+  font-family:'Dancing Script',cursive;font-weight:700;
+  font-size:clamp(32px,6vw,64px);color:var(--gold);
+  line-height:1.1;
+  opacity:0;animation:riseFade 1s cubic-bezier(.16,1,.3,1) forwards 1.1s;
+  filter:drop-shadow(0 0 20px rgba(212,175,55,0.35));
+  margin-bottom:36px;
+}
+.hero-line{
+  width:1px;height:60px;
+  background:linear-gradient(180deg,var(--gold) 0%,transparent 100%);
+  margin:0 auto 32px;
+  opacity:0;animation:riseFade .8s ease forwards 1.3s;
+}
+.hero-sub{
+  font-size:clamp(13px,1.8vw,16px);
+  color:rgba(242,242,242,0.45);
+  max-width:400px;margin:0 auto;line-height:1.8;
+  font-style:italic;
+  opacity:0;animation:riseFade .8s ease forwards 1.5s;
+}
+.hero-cta-group{
+  margin-top:48px;display:flex;gap:16px;justify-content:center;flex-wrap:wrap;
+  opacity:0;animation:riseFade .8s ease forwards 1.8s;
+}
+.btn-gold{
+  display:inline-flex;align-items:center;gap:10px;
+  background:var(--gold);color:var(--deep);
+  padding:15px 40px;border-radius:2px;
+  font-size:11px;font-weight:500;letter-spacing:3px;
+  text-transform:uppercase;text-decoration:none;
+  transition:all .3s ease;border:none;cursor:none;
+}
+.btn-gold:hover{background:#f0d060;transform:translateY(-3px);box-shadow:0 12px 40px rgba(212,175,55,0.35)}
+.btn-ghost{
+  display:inline-flex;align-items:center;gap:10px;
+  background:transparent;color:rgba(242,242,242,0.5);
+  padding:14px 36px;border-radius:2px;
+  border:1px solid rgba(242,242,242,0.15);
+  font-size:11px;letter-spacing:3px;text-transform:uppercase;
+  text-decoration:none;transition:all .3s ease;cursor:none;
+}
+.btn-ghost:hover{border-color:rgba(212,175,55,0.5);color:var(--gold);transform:translateY(-3px)}
+
+/* Scroll breath */
+.scroll-breath{
+  position:absolute;bottom:36px;left:50%;transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:10px;
+  opacity:0;animation:riseFade 1s ease forwards 2.2s;
+}
+.breath-text{font-size:8px;letter-spacing:4px;color:rgba(242,242,242,0.25);text-transform:uppercase}
+.breath-bar{
+  width:1px;height:48px;overflow:hidden;position:relative;
+}
+.breath-fill{
+  position:absolute;top:-100%;left:0;width:1px;height:100%;
+  background:linear-gradient(180deg,var(--gold) 0%,rgba(212,175,55,0) 100%);
+  animation:breathDrop 2.5s cubic-bezier(.4,0,.6,1) infinite;
+}
+@keyframes breathDrop{0%{top:-100%}100%{top:200%}}
+
+/* ════════════════════════════════════════
+   SHARED
+════════════════════════════════════════ */
+.container{max-width:1100px;margin:0 auto;padding:0 48px}
+@media(max-width:600px){.container{padding:0 24px}}
+
+.tag{
+  display:inline-block;
+  font-size:9px;letter-spacing:5px;color:var(--gold);
+  text-transform:uppercase;margin-bottom:20px;
+  opacity:.8;
+}
+.tag::before{content:'';display:inline-block;width:24px;height:1px;background:var(--gold);vertical-align:middle;margin-right:12px;opacity:.5}
+
+h2.section-title{
+  font-family:'Playfair Display',serif;
+  font-weight:900;font-size:clamp(36px,5.5vw,64px);
+  line-height:1.05;color:var(--white);
+  margin-bottom:28px;
+}
+h2.section-title i{
+  font-style:italic;color:var(--gold);
+  font-family:'Dancing Script',cursive;font-weight:700;
+  font-size:1.15em;
+}
+.body-text{
+  font-size:clamp(14px,1.6vw,17px);
+  color:rgba(242,242,242,0.5);
+  line-height:1.85;
+}
+.gold-rule{
+  width:48px;height:1px;background:var(--gold);
+  opacity:.5;margin:24px 0;
+}
+
+/* reveal */
+.r{opacity:0;transform:translateY(36px);transition:opacity .9s ease,transform .9s ease}
+.r.on{opacity:1;transform:none}
+.rd1{transition-delay:.1s}.rd2{transition-delay:.22s}.rd3{transition-delay:.34s}
+.rd4{transition-delay:.46s}.rd5{transition-delay:.58s}
+
+/* ════════════════════════════════════════
+   PROVOCAÇÃO (section 2)
+════════════════════════════════════════ */
+#provocation{
+  padding:160px 0;
+  background:linear-gradient(180deg,var(--deep) 0%,#030b15 100%);
+}
+.provoc-inner{
+  max-width:800px;margin:0 auto;text-align:center;padding:0 32px;
+}
+.provoc-big{
+  font-family:'Playfair Display',serif;
+  font-size:clamp(28px,5vw,56px);font-weight:700;
+  line-height:1.25;color:var(--white);
+  margin-bottom:32px;
+}
+.provoc-big em{color:var(--gold);font-style:italic}
+.provoc-sub{
+  font-size:clamp(14px,1.8vw,18px);
+  color:rgba(242,242,242,0.4);
+  line-height:1.8;max-width:560px;margin:0 auto 48px;
+  font-style:italic;
+}
+/* floating words */
+.float-words{
+  display:flex;gap:16px;flex-wrap:wrap;justify-content:center;
+  margin-bottom:0;
+}
+.fw{
+  padding:8px 20px;border-radius:40px;
+  border:1px solid rgba(29,111,163,0.2);
+  font-size:11px;letter-spacing:2px;
+  color:rgba(242,242,242,0.35);text-transform:uppercase;
+  transition:all .4s ease;
+}
+.fw:hover,.fw.lit{
+  border-color:rgba(212,175,55,0.5);color:var(--gold);
+  background:rgba(212,175,55,0.06);
+  transform:translateY(-2px);
+}
+
+/* ════════════════════════════════════════
+   CONCEITO
+════════════════════════════════════════ */
+#conceito{
+  padding:120px 0;
+  background:#030b15;
+}
+.conceito-layout{
+  display:grid;grid-template-columns:1fr 1fr;gap:100px;align-items:center;
+}
+@media(max-width:800px){.conceito-layout{grid-template-columns:1fr;gap:60px}}
+
+.conceito-text .body-text+.body-text{margin-top:20px}
+.conceito-text .pull-quote{
+  margin-top:36px;padding:20px 0 20px 24px;
+  border-left:2px solid var(--gold);
+  font-family:'Playfair Display',serif;font-style:italic;
+  font-size:clamp(16px,2vw,20px);color:rgba(242,242,242,0.8);
+  line-height:1.5;
+}
+.conceito-text .pull-quote span{color:var(--gold)}
+
+/* Ocean depth visual */
+.depth-visual{
+  position:relative;height:480px;
+  border-radius:4px;overflow:hidden;
+}
+.depth-bg{
+  position:absolute;inset:0;
+  background:linear-gradient(180deg,
+    #1a4a6e 0%,
+    #0D3B66 25%,
+    #071A2C 55%,
+    #030b15 80%,
+    #020910 100%);
+}
+.depth-rays{position:absolute;inset:0;overflow:hidden}
+.depth-ray{
+  position:absolute;top:0;left:50%;
+  width:2px;height:100%;
+  transform-origin:top center;
+}
+.depth-ray:nth-child(1){background:linear-gradient(180deg,rgba(74,184,240,.6) 0%,transparent 55%);transform:rotate(-15deg);animation:rp 5s ease-in-out infinite}
+.depth-ray:nth-child(2){background:linear-gradient(180deg,rgba(74,184,240,.5) 0%,transparent 50%);transform:rotate(-7deg);width:3px;animation:rp 5s ease-in-out infinite .6s}
+.depth-ray:nth-child(3){background:linear-gradient(180deg,rgba(74,184,240,.7) 0%,transparent 60%);transform:rotate(0deg);width:4px;animation:rp 5s ease-in-out infinite 1s}
+.depth-ray:nth-child(4){background:linear-gradient(180deg,rgba(74,184,240,.5) 0%,transparent 50%);transform:rotate(8deg);width:3px;animation:rp 5s ease-in-out infinite 1.5s}
+.depth-ray:nth-child(5){background:linear-gradient(180deg,rgba(74,184,240,.4) 0%,transparent 45%);transform:rotate(18deg);animation:rp 5s ease-in-out infinite 2s}
+@keyframes rp{0%,100%{opacity:.5}50%{opacity:1}}
+
+.depth-surface-line{
+  position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,rgba(74,184,240,.9),rgba(212,175,55,.4),rgba(74,184,240,.9),transparent);
+  animation:wsurf 4s ease-in-out infinite;
+}
+.depth-content{
+  position:absolute;inset:0;display:flex;
+  flex-direction:column;align-items:center;justify-content:center;
+  gap:0;text-align:center;padding:32px;
+}
+.depth-word{
+  font-family:'Playfair Display',serif;font-weight:900;
+  letter-spacing:1px;line-height:1;
+  transition:color .4s;
+}
+.dw-1{font-size:18px;color:rgba(242,242,242,.35);margin-bottom:20px;letter-spacing:6px;text-transform:uppercase;font-size:10px;font-family:'DM Sans',sans-serif}
+.dw-2{font-size:clamp(28px,4vw,48px);color:rgba(242,242,242,.95);padding:12px 0}
+.dw-3{font-size:11px;letter-spacing:4px;text-transform:uppercase;color:rgba(74,184,240,.6);margin:8px 0;font-family:'DM Sans',sans-serif}
+.dw-4{font-size:clamp(20px,3vw,36px);color:rgba(242,242,242,.5);padding:12px 0}
+.dw-5{font-size:11px;letter-spacing:4px;text-transform:uppercase;color:rgba(74,184,240,.4);margin:8px 0;font-family:'DM Sans',sans-serif}
+.dw-6{font-size:clamp(18px,2.5vw,28px);color:rgba(242,242,242,.25);padding:12px 0}
+.dw-7{font-size:11px;letter-spacing:4px;text-transform:uppercase;color:rgba(212,175,55,.5);margin:8px 0;font-family:'DM Sans',sans-serif}
+.dw-8{font-size:clamp(22px,3vw,36px);color:var(--gold);padding:12px 0;filter:drop-shadow(0 0 16px rgba(212,175,55,.5))}
+
+.depth-ruler{
+  position:absolute;left:24px;top:0;bottom:0;
+  width:1px;background:linear-gradient(180deg,rgba(74,184,240,.3),rgba(212,175,55,.3));
+}
+.depth-ruler::before,.depth-ruler::after{
+  content:attr(data-top);
+  position:absolute;left:8px;
+  font-size:9px;letter-spacing:2px;color:rgba(242,242,242,.3);
+  text-transform:uppercase;white-space:nowrap;
+}
+.depth-ruler::before{top:8px;content:'Superfície'}
+.depth-ruler::after{bottom:8px;content:'Essência';color:rgba(212,175,55,.5)}
+
+/* ════════════════════════════════════════
+   JORNADA
+════════════════════════════════════════ */
+#jornada{
+  padding:140px 0;
+  background:linear-gradient(180deg,#030b15 0%,#020910 100%);
+  overflow:hidden;
+}
+.jornada-header{text-align:center;margin-bottom:100px}
+
+/* Horizontal scroll feel — steps */
+.steps-track{
+  display:grid;grid-template-columns:repeat(4,1fr);
+  gap:2px;position:relative;
+}
+@media(max-width:900px){.steps-track{grid-template-columns:1fr 1fr;gap:2px}}
+@media(max-width:500px){.steps-track{grid-template-columns:1fr}}
+
+.step-card{
+  position:relative;padding:52px 32px 40px;
+  background:rgba(7,26,44,0.6);
+  border-top:1px solid rgba(29,111,163,.1);
+  overflow:hidden;
+  transition:background .4s ease;
+}
+.step-card::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(29,111,163,0.06) 0%,transparent 100%);
+  opacity:0;transition:opacity .4s;
+}
+.step-card:hover{background:rgba(13,59,102,0.4)}
+.step-card:hover::before{opacity:1}
+.step-card:hover .step-glyph{transform:scale(1.12);filter:drop-shadow(0 0 20px rgba(212,175,55,.5))}
+.step-card.gold-accent{border-top-color:rgba(212,175,55,.35)}
+.step-card.gold-accent .step-num{color:var(--gold)}
+
+/* step number overlay */
+.step-bg-num{
+  position:absolute;top:-10px;right:16px;
+  font-family:'Playfair Display',serif;font-weight:900;
+  font-size:120px;color:rgba(255,255,255,.025);
+  line-height:1;pointer-events:none;user-select:none;
+}
+.step-card.gold-accent .step-bg-num{color:rgba(212,175,55,.04)}
+
+.step-num{
+  font-size:9px;letter-spacing:5px;color:rgba(74,184,240,.5);
+  text-transform:uppercase;margin-bottom:28px;font-family:'DM Sans',sans-serif;
+}
+.step-glyph{
+  display:block;margin-bottom:28px;width:52px;height:52px;
+  transition:all .4s ease;
+}
+.step-card h3{
+  font-family:'Playfair Display',serif;
+  font-size:clamp(22px,2.5vw,28px);font-weight:700;
+  color:var(--white);margin-bottom:16px;line-height:1;
+}
+.step-card p{
+  font-size:13px;color:rgba(242,242,242,.4);
+  line-height:1.75;
+}
+.step-divider{
+  width:32px;height:1px;background:rgba(212,175,55,.3);margin:20px 0;
+}
+.step-word{
+  font-size:10px;letter-spacing:3px;color:rgba(242,242,242,.2);
+  text-transform:uppercase;font-style:italic;
+}
+
+/* Gold connector line between cards */
+.steps-connector{
+  position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(212,175,55,.2),rgba(212,175,55,.5),rgba(212,175,55,.2),transparent);
+  pointer-events:none;z-index:10;
+}
+
+/* ════════════════════════════════════════
+   IDENTIDADE — CORES
+════════════════════════════════════════ */
+#identidade{
+  padding:140px 0;
+  background:#020910;
+}
+.id-header{margin-bottom:80px}
+
+.id-split{
+  display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:start;
+}
+@media(max-width:800px){.id-split{grid-template-columns:1fr;gap:48px}}
+
+/* Swatch system */
+.swatch-col{display:flex;flex-direction:column;gap:6px;margin-bottom:32px}
+.swatch-row{
+  display:flex;align-items:stretch;gap:4px;height:56px;
+}
+.sw{
+  flex:1;border-radius:2px;position:relative;overflow:hidden;
+  cursor:none;transition:flex .3s cubic-bezier(.4,0,.2,1);
+  display:flex;align-items:flex-end;padding:6px 8px;
+}
+.sw:hover{flex:2.5}
+.sw span{font-size:8px;letter-spacing:1px;opacity:.6;white-space:nowrap;overflow:hidden}
+.sw-dark span{color:rgba(242,242,242,.6)}
+.sw-light span{color:rgba(7,26,44,.5)}
+.sw-1{background:#040e1a}
+.sw-2{background:#071A2C}
+.sw-3{background:#0D3B66}
+.sw-4{background:#1D6FA3}
+.sw-5{background:#4ab8f0}
+.sw-6{background:#F2F2F2}
+.sw-7{background:#D4AF37}
+
+.color-story{margin-top:28px}
+.cs-item{display:flex;gap:16px;align-items:flex-start;margin-bottom:18px}
+.cs-dot{
+  width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:5px;
+  box-shadow:0 0 8px currentColor;
+}
+.cs-item p{font-size:13px;color:rgba(242,242,242,.45);line-height:1.6}
+.cs-item strong{color:var(--white);font-weight:500}
+
+/* Typo showcase */
+.typo-block{margin-bottom:40px;padding-bottom:40px;border-bottom:1px solid rgba(255,255,255,.05)}
+.typo-block:last-child{border-bottom:none;padding-bottom:0;margin-bottom:0}
+.typo-tag{font-size:9px;letter-spacing:4px;color:rgba(212,175,55,.5);text-transform:uppercase;margin-bottom:14px;display:block}
+.t-display{
+  font-family:'Playfair Display',serif;font-weight:900;
+  font-size:clamp(48px,7vw,80px);color:var(--white);
+  line-height:.9;letter-spacing:-1px;
+}
+.t-script{
+  font-family:'Dancing Script',cursive;font-weight:700;
+  font-size:clamp(36px,5vw,60px);color:var(--gold);
+  line-height:1.1;
+  filter:drop-shadow(0 0 12px rgba(212,175,55,.3));
+}
+.t-body{
+  font-family:'DM Sans',sans-serif;font-weight:200;
+  font-size:17px;color:rgba(242,242,242,.55);
+  line-height:1.8;letter-spacing:.3px;
+}
+.t-cap{
+  font-family:'DM Sans',sans-serif;font-weight:400;
+  font-size:11px;letter-spacing:5px;text-transform:uppercase;
+  color:rgba(242,242,242,.3);
+}
+
+/* ════════════════════════════════════════
+   ELEMENTOS VISUAIS — full width feature
+════════════════════════════════════════ */
+#elementos{
+  padding:120px 0;
+  background:linear-gradient(180deg,#020910 0%,#030b15 100%);
+}
+.el-header{text-align:center;margin-bottom:64px}
+
+.el-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:1px;background:rgba(29,111,163,.08);
+}
+@media(max-width:700px){.el-grid{grid-template-columns:1fr}}
+
+.el-card{
+  padding:48px 36px;background:var(--deep);
+  position:relative;overflow:hidden;
+  transition:background .4s;
+  cursor:none;
+}
+.el-card:hover{background:rgba(13,59,102,.25)}
+.el-card::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--gold),transparent);
+  opacity:0;transition:opacity .4s;
+}
+.el-card:hover::after{opacity:1}
+
+.el-icon{margin-bottom:28px;display:block}
+.el-card h4{
+  font-family:'Playfair Display',serif;font-size:20px;
+  color:var(--white);margin-bottom:12px;
+}
+.el-card p{font-size:13px;color:rgba(242,242,242,.4);line-height:1.7}
+.el-tag{
+  margin-top:20px;display:inline-block;
+  font-size:9px;letter-spacing:3px;color:rgba(212,175,55,.4);
+  text-transform:uppercase;
+}
+
+/* ════════════════════════════════════════
+   EXPERIÊNCIA
+════════════════════════════════════════ */
+#experiencia{
+  padding:140px 0;
+  background:linear-gradient(180deg,#030b15 0%,var(--deep) 100%);
+}
+.exp-header{margin-bottom:80px}
+@media(max-width:700px){
+  #experiencia [style*="grid-template-columns:1fr 1fr"]{display:block!important}
+  #experiencia [style*="padding-right:48px"]{padding:0 0 32px!important;text-align:left!important}
+  #experiencia [style*="padding-left:48px"]{padding:0!important}
+  #experiencia [style*="position:absolute;left:-5px"],
+  #experiencia [style*="position:absolute;right:-5px"]{display:none}
+}
+
+/* Stat bar */
+.stat-bar{
+  display:flex;align-items:center;justify-content:center;gap:0;
+  border:1px solid rgba(29,111,163,.15);border-radius:3px;overflow:hidden;
+}
+.stat{
+  flex:1;padding:36px 24px;text-align:center;
+  border-right:1px solid rgba(29,111,163,.1);
+  transition:background .3s;
+}
+.stat:last-child{border-right:none}
+.stat:hover{background:rgba(13,59,102,.2)}
+.stat-n{
+  font-family:'Playfair Display',serif;font-size:clamp(36px,5vw,52px);
+  color:var(--gold);font-weight:700;line-height:1;
+  filter:drop-shadow(0 0 12px rgba(212,175,55,.3));
+}
+.stat-l{font-size:9px;letter-spacing:3px;color:rgba(242,242,242,.25);text-transform:uppercase;margin-top:8px}
+@media(max-width:500px){.stat-bar{flex-direction:column}.stat{border-right:none;border-bottom:1px solid rgba(29,111,163,.1)}}
+
+/* ════════════════════════════════════════
+   CLOSING
+════════════════════════════════════════ */
+#closing{
+  padding:180px 24px;text-align:center;
+  background:var(--abyss);
+  position:relative;overflow:hidden;
+}
+.closing-aura{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:700px;height:700px;border-radius:50%;
+  background:radial-gradient(circle,rgba(29,111,163,.12) 0%,transparent 70%);
+  pointer-events:none;
+  animation:auraPulse 6s ease-in-out infinite;
+}
+@keyframes auraPulse{0%,100%{transform:translate(-50%,-50%) scale(1);opacity:.8}50%{transform:translate(-50%,-50%) scale(1.2);opacity:1}}
+
+.closing-icon{margin-bottom:48px;position:relative}
+.closing-icon svg{width:80px;height:80px;filter:drop-shadow(0 0 30px rgba(212,175,55,.6))}
+
+.closing-eyebrow{font-size:10px;letter-spacing:5px;color:rgba(212,175,55,.4);text-transform:uppercase;margin-bottom:28px}
+.closing-title{
+  font-family:'Playfair Display',serif;font-weight:900;
+  font-size:clamp(30px,6vw,64px);color:var(--white);
+  line-height:1.2;max-width:700px;margin:0 auto 20px;
+  position:relative;
+}
+.closing-title span{
+  display:block;
+  font-family:'Dancing Script',cursive;font-weight:700;
+  font-size:1.25em;color:var(--gold);line-height:1;
+  filter:drop-shadow(0 0 24px rgba(212,175,55,.4));
+}
+.closing-body{
+  font-size:clamp(14px,1.8vw,18px);
+  color:rgba(242,242,242,.3);
+  max-width:480px;margin:0 auto 60px;
+  line-height:1.8;font-style:italic;
+  position:relative;
+}
+.closing-cta{position:relative;margin-bottom:100px}
+
+.closing-footer{
+  position:relative;
+  border-top:1px solid rgba(255,255,255,.05);
+  padding-top:40px;
+  display:flex;align-items:center;justify-content:center;
+  gap:20px;flex-wrap:wrap;
+}
+.closing-footer span{font-size:9px;letter-spacing:3px;color:rgba(242,242,242,.2);text-transform:uppercase}
+.closing-footer .sep{color:rgba(212,175,55,.2)}
+
+@keyframes riseFade{
+  from{opacity:0;transform:translateY(24px)}
+  to{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+
+<!-- Custom cursor -->
+<div class="cursor" id="cur"></div>
+<div class="cursor-ring" id="curRing"></div>
+
+<!-- Global canvas -->
+<canvas id="bg-canvas"></canvas>
+
+<!-- Depth veil -->
+<div id="depth-veil"></div>
+
+<!-- ═══ NAV ═══ -->
+<nav>
+  <a href="#hero" class="nav-brand">C<span>O</span>DIC</a>
+  <ul class="nav-links">
+    <li><a href="#conceito">Conceito</a></li>
+    <li><a href="#jornada">Jornada</a></li>
+    <li><a href="#identidade">Identidade</a></li>
+    <li><a href="#experiencia">Experiência</a></li>
+  </ul>
+  <div class="nav-interact">
+    <div class="nav-interact-text">
+      <div style="color:rgba(242,242,242,.5);font-size:11px;font-weight:400">Interact</div>
+      <div style="color:rgba(242,242,242,.25);font-size:10px">Club de Rondon</div>
+    </div>
+    <svg viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="30" cy="30" r="19" stroke="#D4AF37" stroke-width="2" fill="none"/>
+      <circle cx="30" cy="30" r="11" stroke="#D4AF37" stroke-width="1.5" fill="none"/>
+      <circle cx="30" cy="30" r="3.5" fill="#D4AF37"/>
+      <line x1="30" y1="11" x2="30" y2="19" stroke="#D4AF37" stroke-width="2" stroke-linecap="round"/>
+      <line x1="30" y1="41" x2="30" y2="49" stroke="#D4AF37" stroke-width="2" stroke-linecap="round"/>
+      <line x1="11" y1="30" x2="19" y2="30" stroke="#D4AF37" stroke-width="2" stroke-linecap="round"/>
+      <line x1="41" y1="30" x2="49" y2="30" stroke="#D4AF37" stroke-width="2" stroke-linecap="round"/>
+      <line x1="16.9" y1="16.9" x2="22.8" y2="22.8" stroke="#D4AF37" stroke-width="2" stroke-linecap="round"/>
+      <line x1="37.2" y1="37.2" x2="43.1" y2="43.1" stroke="#D4AF37" stroke-width="2" stroke-linecap="round"/>
+      <line x1="43.1" y1="16.9" x2="37.2" y2="22.8" stroke="#D4AF37" stroke-width="2" stroke-linecap="round"/>
+      <line x1="22.8" y1="37.2" x2="16.9" y2="43.1" stroke="#D4AF37" stroke-width="2" stroke-linecap="round"/>
+      <!-- gear teeth -->
+      <g stroke="#D4AF37" stroke-width="1.5" stroke-linecap="round">
+        <line x1="30" y1="5" x2="30" y2="9"/><line x1="30" y1="51" x2="30" y2="55"/>
+        <line x1="5" y1="30" x2="9" y2="30"/><line x1="51" y1="30" x2="55" y2="30"/>
+        <line x1="11.7" y1="11.7" x2="14.5" y2="14.5"/><line x1="45.5" y1="45.5" x2="48.3" y2="48.3"/>
+        <line x1="48.3" y1="11.7" x2="45.5" y2="14.5"/><line x1="14.5" y1="45.5" x2="11.7" y2="48.3"/>
+        <line x1="20.5" y1="6.3" x2="22" y2="9.8"/><line x1="38" y1="50.2" x2="39.5" y2="53.7"/>
+        <line x1="6.3" y1="39.5" x2="9.8" y2="38"/><line x1="50.2" y1="22" x2="53.7" y2="20.5"/>
+        <line x1="6.3" y1="20.5" x2="9.8" y2="22"/><line x1="50.2" y1="38" x2="53.7" y2="39.5"/>
+        <line x1="20.5" y1="53.7" x2="22" y2="50.2"/><line x1="38" y1="9.8" x2="39.5" y2="6.3"/>
+      </g>
+    </svg>
+  </div>
+</nav>
+
+<!-- ═══ HERO ═══ -->
+<section id="hero">
+  <div class="water-surface"></div>
+
+  <!-- Central ICON — the event symbol -->
+  <div class="hero-icon">
+    <div class="halo halo-1"></div>
+    <div class="halo halo-2"></div>
+    <div class="halo halo-3"></div>
+    <!-- CODIC SYMBOL: arch + downward ray + emerge star -->
+    <svg class="icon-svg" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- Outer arch -->
+      <path d="M15 80 L15 50 Q15 12 50 12 Q85 12 85 50 L85 80" stroke="#D4AF37" stroke-width="1.5" fill="none" class="icon-pulse"/>
+      <!-- Inner arch -->
+      <path d="M25 80 L25 52 Q25 22 50 22 Q75 22 75 52 L75 80" stroke="#D4AF37" stroke-width=".5" fill="none" opacity=".35"/>
+      <!-- Descending light ray -->
+      <line x1="50" y1="12" x2="50" y2="72" stroke="#4ab8f0" stroke-width="1.5" stroke-dasharray="3 4" class="icon-pulse"/>
+      <!-- Star of emergence at bottom -->
+      <circle cx="50" cy="72" r="6" fill="none" stroke="#D4AF37" stroke-width="1.2" class="icon-pulse"/>
+      <circle cx="50" cy="72" r="2.5" fill="#D4AF37" class="icon-pulse"/>
+      <!-- Corner stars -->
+      <g fill="#D4AF37" class="icon-pulse">
+        <polygon points="15,50 12,44 15,38 18,44"/>
+        <polygon points="85,50 82,44 85,38 88,44"/>
+      </g>
+      <!-- Particles -->
+      <circle cx="32" cy="38" r="1.2" fill="#4ab8f0" opacity=".6"/>
+      <circle cx="68" cy="32" r="1" fill="#D4AF37" opacity=".7"/>
+      <circle cx="40" cy="58" r=".8" fill="#F2F2F2" opacity=".5"/>
+      <circle cx="62" cy="55" r="1" fill="#4ab8f0" opacity=".4"/>
+    </svg>
+  </div>
+
+  <div class="hero-kicker">Interact Club de Rondon · Rotary · 2024–2025</div>
+  <h1 class="hero-title">CODIC</h1>
+  <div class="hero-script">Além da Superfície</div>
+  <div class="hero-line"></div>
+  <p class="hero-sub">Você conhece sua aparência.<br>Mas conhece sua <em style="color:var(--gold);font-style:normal">essência?</em></p>
+  <div class="hero-cta-group">
+    <a href="#conceito" class="btn-gold">Mergulhe ↓</a>
+    <a href="#experiencia" class="btn-ghost">A experiência</a>
+  </div>
+
+  <div class="scroll-breath">
+    <span class="breath-text">Desça</span>
+    <div class="breath-bar"><div class="breath-fill"></div></div>
+  </div>
+</section>
+
+<!-- ═══ PROVOCAÇÃO ═══ -->
+<section id="provocation">
+  <div class="provoc-inner">
+    <div class="r">
+      <span class="tag">A pergunta que ninguém faz</span>
+    </div>
+    <h2 class="provoc-big r rd1">
+      Você passou a vida inteira<br>mostrando quem você <em>parece.</em><br>E se chegasse a hora de descobrir<br>quem você <em>é?</em>
+    </h2>
+    <p class="provoc-sub r rd2">O CODIC não é uma cerimônia. É uma descida consciente ao que há de mais verdadeiro em cada um.</p>
+    <div class="float-words r rd3">
+      <div class="fw">Propósito</div>
+      <div class="fw">Liderança</div>
+      <div class="fw">Identidade</div>
+      <div class="fw">Coragem</div>
+      <div class="fw">Transformação</div>
+      <div class="fw">Essência</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CONCEITO ═══ -->
+<section id="conceito">
+  <div class="container">
+    <div class="conceito-layout">
+      <div class="conceito-text r">
+        <span class="tag">O Conceito</span>
+        <h2 class="section-title">Além da<br><i>Superfície</i></h2>
+        <div class="gold-rule"></div>
+        <p class="body-text">A superfície é o lugar mais seguro do mundo. Todo mundo te vê. Você sorri. Parece que está bem. Mas embaixo d'água — onde a luz mal chega — é onde mora o que você realmente é.</p>
+        <p class="body-text r rd1" style="margin-top:20px">O conceito do CODIC convida cada jovem a parar de nadar na rasa e mergulhar de verdade: no propósito, na identidade, na liderança que não precisa de plateia para existir.</p>
+        <blockquote class="pull-quote r rd2">
+          "Depois de viajar o mundo conosco, agora é hora de <span>mergulhar mais fundo</span>. Descobrir nossa real essência."
+        </blockquote>
+      </div>
+
+      <div class="depth-visual r rd2">
+        <div class="depth-bg"></div>
+        <div class="depth-rays">
+          <div class="depth-ray"></div>
+          <div class="depth-ray"></div>
+          <div class="depth-ray"></div>
+          <div class="depth-ray"></div>
+          <div class="depth-ray"></div>
+        </div>
+        <div class="depth-surface-line"></div>
+        <div class="depth-ruler"></div>
+        <div class="depth-content">
+          <div class="depth-word dw-1">Você aqui agora</div>
+          <div class="depth-word dw-2">Superfície</div>
+          <div class="depth-word dw-3">↓  Descendo  ↓</div>
+          <div class="depth-word dw-4">Imersão</div>
+          <div class="depth-word dw-5">↓  Mais fundo  ↓</div>
+          <div class="depth-word dw-6">Profundidade</div>
+          <div class="depth-word dw-7">↓  O núcleo  ↓</div>
+          <div class="depth-word dw-8">Essência</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ JORNADA ═══ -->
+<section id="jornada">
+  <div class="container">
+    <div class="jornada-header">
+      <span class="tag r">A Jornada</span>
+      <h2 class="section-title r rd1">Quatro camadas.<br><i>Uma vida.</i></h2>
+      <p class="body-text r rd2" style="max-width:520px;margin:0 auto;text-align:center">Cada parte do evento corresponde a uma descida mais profunda. Você não sai como entrou.</p>
+    </div>
+
+    <div class="steps-track">
+      <div class="step-card r">
+        <div class="step-bg-num">1</div>
+        <div class="step-num">Nível 01</div>
+        <svg class="step-glyph" viewBox="0 0 52 52" fill="none">
+          <path d="M6 26 Q13 18 26 26 Q39 34 46 26" stroke="#4ab8f0" stroke-width="2" fill="none"/>
+          <path d="M6 32 Q13 24 26 32 Q39 40 46 32" stroke="#4ab8f0" stroke-width="1" fill="none" opacity=".4"/>
+          <path d="M6 20 Q13 12 26 20 Q39 28 46 20" stroke="#4ab8f0" stroke-width="1" fill="none" opacity=".25"/>
+          <circle cx="26" cy="14" r="3.5" fill="#4ab8f0" opacity=".5"/>
+        </svg>
+        <h3>Superfície</h3>
+        <div class="step-divider"></div>
+        <p>O mundo visível. O sorriso que todo mundo vê. A chegada. O que somos quando ainda há luz suficiente para fingir.</p>
+        <div class="step-word">O que parece ser</div>
+      </div>
+
+      <div class="step-card r rd1">
+        <div class="step-bg-num">2</div>
+        <div class="step-num">Nível 02</div>
+        <svg class="step-glyph" viewBox="0 0 52 52" fill="none">
+          <line x1="26" y1="4" x2="26" y2="48" stroke="#1D6FA3" stroke-width="2" stroke-dasharray="4 4"/>
+          <circle cx="26" cy="4" r="3" fill="#1D6FA3" opacity=".8"/>
+          <circle cx="26" cy="22" r="2" fill="#1D6FA3" opacity=".5"/>
+          <circle cx="26" cy="38" r="1.5" fill="#1D6FA3" opacity=".3"/>
+          <circle cx="26" cy="48" r="5" fill="none" stroke="#1D6FA3" stroke-width="1.5" opacity=".4"/>
+        </svg>
+        <h3>Imersão</h3>
+        <div class="step-divider"></div>
+        <p>A descida começa. O barulho do mundo vai ficando para trás. O silêncio começa a dizer coisas que o barulho escondia.</p>
+        <div class="step-word">O que se sente</div>
+      </div>
+
+      <div class="step-card r rd2">
+        <div class="step-bg-num">3</div>
+        <div class="step-num">Nível 03</div>
+        <svg class="step-glyph" viewBox="0 0 52 52" fill="none">
+          <circle cx="26" cy="26" r="18" stroke="#0D3B66" stroke-width="2"/>
+          <circle cx="26" cy="26" r="11" stroke="#1D6FA3" stroke-width="1.5"/>
+          <circle cx="26" cy="26" r="5" stroke="#4ab8f0" stroke-width="1" fill="none"/>
+          <circle cx="26" cy="26" r="2" fill="#4ab8f0"/>
+        </svg>
+        <h3>Profundidade</h3>
+        <div class="step-divider"></div>
+        <p>O núcleo. Onde propósito vive. Onde liderança nasce sem precisar de aprovação. Aqui é onde o real começa.</p>
+        <div class="step-word">O que existe</div>
+      </div>
+
+      <div class="step-card gold-accent r rd3">
+        <div class="step-bg-num">4</div>
+        <div class="step-num">Nível 04</div>
+        <svg class="step-glyph" viewBox="0 0 52 52" fill="none">
+          <polygon points="26,4 30,18 44,18 33,27 37,41 26,32 15,41 19,27 8,18 22,18" stroke="#D4AF37" stroke-width="1.8" fill="none" stroke-linejoin="round"/>
+          <circle cx="26" cy="26" r="4" fill="#D4AF37" opacity=".8"/>
+          <circle cx="26" cy="26" r="8" stroke="#D4AF37" stroke-width=".5" fill="none" opacity=".3"/>
+        </svg>
+        <h3>Transformação</h3>
+        <div class="step-divider" style="background:var(--gold)"></div>
+        <p>A ressurgência. Você sobe com uma história diferente dentro. O novo ciclo rotário começa com verdade, não com cargo.</p>
+        <div class="step-word" style="color:rgba(212,175,55,.35)">O que você se torna</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ IDENTIDADE ═══ -->
+<section id="identidade">
+  <div class="container">
+    <div class="id-header r">
+      <span class="tag">Sistema de Design</span>
+      <h2 class="section-title">A identidade<br><i>visual</i></h2>
+      <div class="gold-rule"></div>
+    </div>
+
+    <div class="id-split">
+      <!-- Colors -->
+      <div class="r">
+        <p style="font-size:11px;letter-spacing:3px;color:rgba(212,175,55,.5);text-transform:uppercase;margin-bottom:24px">Paleta de Cores</p>
+        <div class="swatch-col">
+          <div class="swatch-row">
+            <div class="sw sw-1 sw-dark"><span>#040E1A</span></div>
+            <div class="sw sw-2 sw-dark"><span>#071A2C</span></div>
+            <div class="sw sw-3 sw-dark"><span>#0D3B66</span></div>
+            <div class="sw sw-4 sw-dark"><span>#1D6FA3</span></div>
+            <div class="sw sw-5 sw-light"><span>#F2F2F2</span></div>
+            <div class="sw sw-7 sw-light"><span>#D4AF37</span></div>
+          </div>
+        </div>
+        <div class="color-story">
+          <div class="cs-item">
+            <div class="cs-dot" style="background:#0D3B66;color:#0D3B66"></div>
+            <p><strong>Azul profundo</strong> — as camadas mais fundas. Mistério, seriedade, o oceano onde ninguém ainda chegou.</p>
+          </div>
+          <div class="cs-item">
+            <div class="cs-dot" style="background:#4ab8f0;color:#4ab8f0"></div>
+            <p><strong>Azul brilho</strong> — os raios de luz. A esperança que penetra mesmo o mais escuro dos fundos.</p>
+          </div>
+          <div class="cs-item">
+            <div class="cs-dot" style="background:#D4AF37;color:#D4AF37"></div>
+            <p><strong>Dourado</strong> — liderança, transformação. O brilho que só aparece quando você chega fundo o suficiente.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Typography -->
+      <div class="r rd2">
+        <p style="font-size:11px;letter-spacing:3px;color:rgba(212,175,55,.5);text-transform:uppercase;margin-bottom:24px">Tipografia</p>
+        <div class="typo-block">
+          <span class="typo-tag">Display — Playfair Display 900</span>
+          <div class="t-display">CODIC</div>
+          <p style="font-size:11px;color:rgba(242,242,242,.25);margin-top:8px">Impacto atemporal · Credibilidade · Peso institucional</p>
+        </div>
+        <div class="typo-block">
+          <span class="typo-tag">Script — Dancing Script 700</span>
+          <div class="t-script">Além da Superfície</div>
+          <p style="font-size:11px;color:rgba(242,242,242,.25);margin-top:8px">Fluidez humana · Emoção · Identidade jovem</p>
+        </div>
+        <div class="typo-block">
+          <span class="typo-tag">Body — DM Sans 200</span>
+          <div class="t-body">Clareza e leveza para textos que respiram.</div>
+          <p style="font-size:11px;color:rgba(242,242,242,.25);margin-top:8px">Modernidade · Acessibilidade · Ar</p>
+        </div>
+        <div class="typo-block">
+          <span class="typo-tag">Caps — DM Sans 400 tracked</span>
+          <div class="t-cap">Cerimônia de Transmissão de Posse</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ ELEMENTOS ═══ -->
+<section id="elementos">
+  <div class="container">
+    <div class="el-header r">
+      <span class="tag">Elementos Visuais</span>
+      <h2 class="section-title">O que torna tudo<br><i>reconhecível</i></h2>
+    </div>
+    <div class="el-grid">
+      <div class="el-card r">
+        <svg class="el-icon" width="44" height="44" viewBox="0 0 44 44" fill="none">
+          <path d="M4 22 Q11 14 22 22 Q33 30 40 22" stroke="#4ab8f0" stroke-width="1.8" fill="none"/>
+          <path d="M4 28 Q11 20 22 28 Q33 36 40 28" stroke="#4ab8f0" stroke-width=".9" fill="none" opacity=".45"/>
+          <path d="M4 16 Q11 8 22 16 Q33 24 40 16" stroke="#4ab8f0" stroke-width=".9" fill="none" opacity=".25"/>
+        </svg>
+        <h4>Ondas Orgânicas</h4>
+        <p>Formas sinuosas que respiram — evocando o movimento da água e a fluidez de quem está em transformação.</p>
+        <span class="el-tag">Movimento · Vida</span>
+      </div>
+      <div class="el-card r rd1">
+        <svg class="el-icon" width="44" height="44" viewBox="0 0 44 44" fill="none">
+          <line x1="22" y1="2" x2="18" y2="42" stroke="#1D6FA3" stroke-width="2.5" opacity=".8"/>
+          <line x1="27" y1="2" x2="23" y2="42" stroke="#4ab8f0" stroke-width="1.5" opacity=".55"/>
+          <line x1="32" y1="2" x2="28" y2="42" stroke="#1D6FA3" stroke-width="1" opacity=".3"/>
+          <line x1="17" y1="2" x2="13" y2="42" stroke="#4ab8f0" stroke-width="1" opacity=".2"/>
+          <ellipse cx="25" cy="2" rx="14" ry="2.5" fill="rgba(74,184,240,.2)"/>
+        </svg>
+        <h4>Raios de Luz</h4>
+        <p>A luz que desce desde a superfície até o fundo. Símbolo de propósito, esperança e direção em meio ao escuro.</p>
+        <span class="el-tag">Esperança · Direção</span>
+      </div>
+      <div class="el-card r rd2">
+        <svg class="el-icon" width="44" height="44" viewBox="0 0 44 44" fill="none">
+          <circle cx="22" cy="22" r="2.5" fill="#D4AF37"/>
+          <circle cx="12" cy="12" r="1.8" fill="#D4AF37" opacity=".6"/>
+          <circle cx="34" cy="10" r="1.2" fill="#D4AF37" opacity=".45"/>
+          <circle cx="8" cy="32" r="1.2" fill="#4ab8f0" opacity=".5"/>
+          <circle cx="36" cy="30" r="1.8" fill="#D4AF37" opacity=".5"/>
+          <circle cx="22" cy="38" r="1.2" fill="#4ab8f0" opacity=".4"/>
+          <circle cx="30" cy="20" r=".9" fill="#F2F2F2" opacity=".55"/>
+          <circle cx="14" cy="28" r=".9" fill="#F2F2F2" opacity=".4"/>
+          <circle cx="40" cy="18" r=".7" fill="#D4AF37" opacity=".35"/>
+          <circle cx="6" cy="18" r=".7" fill="#4ab8f0" opacity=".35"/>
+        </svg>
+        <h4>Partículas Etéreas</h4>
+        <p>Brilhos suspensos — como poeira de luz no fundo do oceano. O efeito mágico que transforma ambiente em experiência.</p>
+        <span class="el-tag">Magia · Atmosfera</span>
+      </div>
+      <div class="el-card r rd3">
+        <svg class="el-icon" width="44" height="44" viewBox="0 0 44 44" fill="none">
+          <path d="M8 38 L8 22 Q8 5 22 5 Q36 5 36 22 L36 38" stroke="#D4AF37" stroke-width="1.5" fill="none" opacity=".8"/>
+          <path d="M13 38 L13 24 Q13 10 22 10 Q31 10 31 24 L31 38" stroke="#D4AF37" stroke-width=".5" fill="none" opacity=".3"/>
+          <circle cx="22" cy="34" r="3" fill="none" stroke="#D4AF37" stroke-width="1.2" opacity=".6"/>
+          <circle cx="22" cy="34" r="1" fill="#D4AF37" opacity=".7"/>
+        </svg>
+        <h4>Arco Portal</h4>
+        <p>A passagem. O símbolo central do CODIC — a entrada para um novo ciclo, um novo papel, um novo eu.</p>
+        <span class="el-tag">Transição · Posse</span>
+      </div>
+      <div class="el-card r rd4">
+        <svg class="el-icon" width="44" height="44" viewBox="0 0 44 44" fill="none">
+          <line x1="4" y1="22" x2="40" y2="22" stroke="#D4AF37" stroke-width=".8" opacity=".7"/>
+          <circle cx="22" cy="22" r="2.5" fill="#D4AF37" opacity=".8"/>
+          <circle cx="12" cy="22" r="1.2" fill="#D4AF37" opacity=".4"/>
+          <circle cx="32" cy="22" r="1.2" fill="#D4AF37" opacity=".4"/>
+          <polygon points="22,16 20,19 22,22 24,19" fill="#D4AF37" opacity=".6"/>
+        </svg>
+        <h4>Linhas e Ornamentos</h4>
+        <p>Separadores dourados que organizam o espaço com precisão cirúrgica — sofisticação que não grita, mas impõe.</p>
+        <span class="el-tag">Elegância · Ordem</span>
+      </div>
+      <div class="el-card r rd5">
+        <svg class="el-icon" width="44" height="44" viewBox="0 0 44 44" fill="none">
+          <circle cx="22" cy="22" r="16" stroke="#D4AF37" stroke-width="1.5" fill="none" opacity=".8"/>
+          <circle cx="22" cy="22" r="10" stroke="#D4AF37" stroke-width="1" fill="none" opacity=".5"/>
+          <circle cx="22" cy="22" r="3.5" fill="#D4AF37" opacity=".9"/>
+          <line x1="22" y1="6" x2="22" y2="12" stroke="#D4AF37" stroke-width="1.5"/>
+          <line x1="22" y1="32" x2="22" y2="38" stroke="#D4AF37" stroke-width="1.5"/>
+          <line x1="6" y1="22" x2="12" y2="22" stroke="#D4AF37" stroke-width="1.5"/>
+          <line x1="32" y1="22" x2="38" y2="22" stroke="#D4AF37" stroke-width="1.5"/>
+          <line x1="10.7" y1="10.7" x2="14.9" y2="14.9" stroke="#D4AF37" stroke-width="1.5"/>
+          <line x1="29.1" y1="29.1" x2="33.3" y2="33.3" stroke="#D4AF37" stroke-width="1.5"/>
+          <line x1="33.3" y1="10.7" x2="29.1" y2="14.9" stroke="#D4AF37" stroke-width="1.5"/>
+          <line x1="14.9" y1="29.1" x2="10.7" y2="33.3" stroke="#D4AF37" stroke-width="1.5"/>
+        </svg>
+        <h4>Símbolo Rotário</h4>
+        <p>A roda dentada — dourada, integrada ao universo subaquático. Institucional sem perder a alma do evento.</p>
+        <span class="el-tag">Pertencimento · Legado</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══ EXPERIÊNCIA ═══ -->
+<section id="experiencia">
+  <div class="container">
+
+    <div class="exp-header r">
+      <span class="tag">A Experiência do Evento</span>
+      <h2 class="section-title">Design que você<br><i>sente antes de ver.</i></h2>
+      <div class="gold-rule"></div>
+      <p class="body-text" style="max-width:560px">O CODIC não começa quando as luzes se apagam. Começa no momento em que alguém vê o convite — e já sente que aquela noite vai mudar algo.</p>
+    </div>
+
+    <!-- TIMELINE de imersão -->
+    <div style="position:relative;margin:72px 0 80px">
+      <!-- vertical spine -->
+      <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:linear-gradient(180deg,transparent,rgba(212,175,55,.3) 10%,rgba(212,175,55,.3) 90%,transparent);transform:translateX(-50%)"></div>
+
+      <!-- Item 1 — left -->
+      <div class="r" style="display:grid;grid-template-columns:1fr 1fr;gap:48px;margin-bottom:64px;align-items:center">
+        <div style="text-align:right;padding-right:48px">
+          <div style="font-size:9px;letter-spacing:4px;color:rgba(212,175,55,.4);text-transform:uppercase;margin-bottom:12px">Dias antes</div>
+          <h3 style="font-family:'Playfair Display',serif;font-size:clamp(20px,2.5vw,26px);color:var(--white);margin-bottom:14px;line-height:1.15">O convite chega.<br>A imersão começa.</h3>
+          <p style="font-size:14px;color:rgba(242,242,242,.4);line-height:1.75">Antes de entrar no salão, o participante já está dentro do oceano. O design digital planta a expectativa — aquela sensação de que algo real vai acontecer.</p>
+        </div>
+        <div style="padding-left:48px;position:relative">
+          <!-- node on spine -->
+          <div style="position:absolute;left:-5px;top:50%;transform:translateY(-50%);width:10px;height:10px;border-radius:50%;background:var(--bright);border:2px solid var(--gold);box-shadow:0 0 16px rgba(212,175,55,.4)"></div>
+          <div style="background:rgba(13,59,102,.15);border:1px solid rgba(29,111,163,.12);border-left:2px solid rgba(212,175,55,.3);padding:28px 32px;border-radius:2px">
+            <div style="font-size:28px;font-weight:900;font-family:'Playfair Display',serif;color:var(--gold);line-height:1;margin-bottom:6px">∙ Antecipação</div>
+            <div style="font-size:11px;letter-spacing:2px;color:rgba(242,242,242,.25);text-transform:uppercase">O coração acelera antes de saber por quê</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Item 2 — right -->
+      <div class="r rd1" style="display:grid;grid-template-columns:1fr 1fr;gap:48px;margin-bottom:64px;align-items:center">
+        <div style="padding-right:48px;position:relative;text-align:right">
+          <!-- node -->
+          <div style="position:absolute;right:-5px;top:50%;transform:translateY(-50%);width:10px;height:10px;border-radius:50%;background:var(--bright);border:2px solid var(--gold);box-shadow:0 0 16px rgba(212,175,55,.4)"></div>
+          <div style="background:rgba(13,59,102,.15);border:1px solid rgba(29,111,163,.12);border-right:2px solid rgba(212,175,55,.3);padding:28px 32px;border-radius:2px;text-align:left">
+            <div style="font-size:28px;font-weight:900;font-family:'Playfair Display',serif;color:var(--gold);line-height:1;margin-bottom:6px">∙ Pertencimento</div>
+            <div style="font-size:11px;letter-spacing:2px;color:rgba(242,242,242,.25);text-transform:uppercase">O badge diz quem você é nesse ciclo</div>
+          </div>
+        </div>
+        <div style="padding-left:48px">
+          <div style="font-size:9px;letter-spacing:4px;color:rgba(212,175,55,.4);text-transform:uppercase;margin-bottom:12px">Na chegada</div>
+          <h3 style="font-family:'Playfair Display',serif;font-size:clamp(20px,2.5vw,26px);color:var(--white);margin-bottom:14px;line-height:1.15">A credencial não é<br>só um crachá.</h3>
+          <p style="font-size:14px;color:rgba(242,242,242,.4);line-height:1.75">Cada nível tem cor, símbolo e luz próprios. Participante, staff, diretoria, mesa diretora — quatro profundezas, quatro identidades. Ninguém guarda um crachá. Mas guardam esse.</p>
+        </div>
+      </div>
+
+      <!-- Item 3 — left -->
+      <div class="r rd2" style="display:grid;grid-template-columns:1fr 1fr;gap:48px;margin-bottom:64px;align-items:center">
+        <div style="text-align:right;padding-right:48px">
+          <div style="font-size:9px;letter-spacing:4px;color:rgba(212,175,55,.4);text-transform:uppercase;margin-bottom:12px">No palco</div>
+          <h3 style="font-family:'Playfair Display',serif;font-size:clamp(20px,2.5vw,26px);color:var(--white);margin-bottom:14px;line-height:1.15">150 pessoas.<br>Um oceano só.</h3>
+          <p style="font-size:14px;color:rgba(242,242,242,.4);line-height:1.75">Os raios de luz do telão transformam o salão em fundo do mar. A posse acontece no fundo — onde propósito mora. Onde ninguém vai sem escolher descer.</p>
+        </div>
+        <div style="padding-left:48px;position:relative">
+          <div style="position:absolute;left:-5px;top:50%;transform:translateY(-50%);width:10px;height:10px;border-radius:50%;background:var(--bright);border:2px solid var(--gold);box-shadow:0 0 16px rgba(212,175,55,.4)"></div>
+          <div style="background:rgba(13,59,102,.15);border:1px solid rgba(29,111,163,.12);border-left:2px solid rgba(212,175,55,.3);padding:28px 32px;border-radius:2px">
+            <div style="font-size:28px;font-weight:900;font-family:'Playfair Display',serif;color:var(--gold);line-height:1;margin-bottom:6px">∙ Imersão</div>
+            <div style="font-size:11px;letter-spacing:2px;color:rgba(242,242,242,.25);text-transform:uppercase">Quando o ambiente vira personagem</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Item 4 — right -->
+      <div class="r rd3" style="display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center">
+        <div style="padding-right:48px;position:relative;text-align:right">
+          <div style="position:absolute;right:-5px;top:50%;transform:translateY(-50%);width:12px;height:12px;border-radius:50%;background:var(--gold);border:2px solid var(--gold);box-shadow:0 0 24px rgba(212,175,55,.6)"></div>
+          <div style="background:rgba(212,175,55,.04);border:1px solid rgba(212,175,55,.15);border-right:2px solid var(--gold);padding:28px 32px;border-radius:2px;text-align:left">
+            <div style="font-size:28px;font-weight:900;font-family:'Playfair Display',serif;color:var(--gold);line-height:1;margin-bottom:6px">∙ Transformação</div>
+            <div style="font-size:11px;letter-spacing:2px;color:rgba(212,175,55,.3);text-transform:uppercase">O design virou cicatriz boa</div>
+          </div>
+        </div>
+        <div style="padding-left:48px">
+          <div style="font-size:9px;letter-spacing:4px;color:rgba(212,175,55,.4);text-transform:uppercase;margin-bottom:12px">Para sempre</div>
+          <h3 style="font-family:'Playfair Display',serif;font-size:clamp(20px,2.5vw,26px);color:var(--white);margin-bottom:14px;line-height:1.15">Você sai diferente.<br>O design também.</h3>
+          <p style="font-size:14px;color:rgba(242,242,242,.4);line-height:1.75">Post guardado, badge na gaveta, foto no celular. Cada peça vira memória afetiva. O CODIC termina no encerramento — mas a marca fica dentro de cada pessoa que esteve lá.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- stat bar -->
+    <div class="stat-bar r rd2">
+      <div class="stat">
+        <div class="stat-n">150+</div>
+        <div class="stat-l">Participantes</div>
+      </div>
+      <div class="stat">
+        <div class="stat-n">4</div>
+        <div class="stat-l">Camadas de design</div>
+      </div>
+      <div class="stat">
+        <div class="stat-n">1</div>
+        <div class="stat-l">Experiência</div>
+      </div>
+      <div class="stat">
+        <div class="stat-n">∞</div>
+        <div class="stat-l">Memória</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ═══ CLOSING ═══ -->
+<section id="closing">
+  <div class="closing-aura"></div>
+  <div class="closing-icon r">
+    <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M10 65 L10 40 Q10 8 40 8 Q70 8 70 40 L70 65" stroke="#D4AF37" stroke-width="1.5" fill="none"/>
+      <path d="M20 65 L20 43 Q20 18 40 18 Q60 18 60 43 L60 65" stroke="#D4AF37" stroke-width=".5" fill="none" opacity=".35"/>
+      <line x1="40" y1="8" x2="40" y2="56" stroke="#4ab8f0" stroke-width="1.5" stroke-dasharray="3 4" opacity=".8"/>
+      <circle cx="40" cy="56" r="7" fill="none" stroke="#D4AF37" stroke-width="1.5"/>
+      <circle cx="40" cy="56" r="3" fill="#D4AF37"/>
+      <g fill="#D4AF37" opacity=".7">
+        <polygon points="10,40 7,34 10,28 13,34"/>
+        <polygon points="70,40 67,34 70,28 73,34"/>
+      </g>
+    </svg>
+  </div>
+  <div class="closing-eyebrow r rd1">CODIC · Além da Superfície · 2024–2025</div>
+  <h2 class="closing-title r rd2">
+    Isso não é só um evento.
+    <span>É o início de quem<br>você vai se tornar.</span>
+  </h2>
+  <p class="closing-body r rd3">Uma identidade que carrega propósito. Uma experiência que começa no convite e termina — se é que termina — na memória.</p>
+  <div class="closing-cta r rd4">
+    <a href="#hero" class="btn-gold">Voltar à superfície ↑</a>
+  </div>
+  <div class="closing-footer r rd5">
+    <span>CODIC</span><span class="sep">·</span>
+    <span>Além da Superfície</span><span class="sep">·</span>
+    <span>Interact Club de Rondon</span><span class="sep">·</span>
+    <span>Rotary 2024–2025</span>
+  </div>
+</section>
+
+<script>
+/* ═══ CURSOR ═══ */
+const cur=document.getElementById('cur'),curRing=document.getElementById('curRing');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cur.style.left=mx+'px';cur.style.top=my+'px'});
+(function ring(){rx+=(mx-rx)*.12;ry+=(my-ry)*.12;curRing.style.left=rx+'px';curRing.style.top=ry+'px';requestAnimationFrame(ring)})();
+document.querySelectorAll('a,button,.el-card,.step-card,.sw,.stat').forEach(el=>{
+  el.addEventListener('mouseenter',()=>{curRing.style.transform='translate(-50%,-50%) scale(1.8)';curRing.style.borderColor='rgba(212,175,55,.7)'});
+  el.addEventListener('mouseleave',()=>{curRing.style.transform='translate(-50%,-50%) scale(1)';curRing.style.borderColor='rgba(212,175,55,.4)'});
+});
+
+/* ═══ PARTICLES ═══ */
+const cv=document.getElementById('bg-canvas');
+const ctx=cv.getContext('2d');
+let W,H,pts=[];
+function resize(){W=cv.width=window.innerWidth;H=cv.height=window.innerHeight}
+resize();window.addEventListener('resize',resize);
+function randBetween(a,b){return Math.random()*(b-a)+a}
+function mkPts(){
+  pts=[];
+  const n=Math.min(Math.floor(W*H/10000),100);
+  for(let i=0;i<n;i++){
+    const gold=Math.random()>.72;
+    pts.push({x:randBetween(0,W),y:randBetween(0,H),r:randBetween(.5,2.2),
+      vx:randBetween(-.08,.08),vy:randBetween(-.25,-.04),
+      a:randBetween(.1,.65),c:gold?'#D4AF37':Math.random()>.5?'#4ab8f0':'#F2F2F2',
+      ph:randBetween(0,Math.PI*2),ps:randBetween(.008,.025)});
+  }
+}
+mkPts();window.addEventListener('resize',mkPts);
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  const scrollFrac=window.scrollY/(document.body.scrollHeight-window.innerHeight||1);
+  pts.forEach(p=>{
+    p.ph+=p.ps;
+    const a=p.a*(0.4+0.6*Math.sin(p.ph));
+    ctx.save();ctx.globalAlpha=a*(1-scrollFrac*.5);
+    ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    ctx.fillStyle=p.c;ctx.fill();ctx.restore();
+    p.x+=p.vx;p.y+=p.vy;
+    if(p.y<-5){p.y=H+5;p.x=randBetween(0,W)}
+    if(p.x<-5)p.x=W+5;if(p.x>W+5)p.x=-5;
+  });
+  requestAnimationFrame(draw);
+}
+draw();
+
+/* ═══ DEPTH VEIL (darkens on scroll) ═══ */
+const veil=document.getElementById('depth-veil');
+window.addEventListener('scroll',()=>{
+  const f=Math.min(window.scrollY/window.innerHeight,1);
+  veil.style.opacity=(f*.45).toFixed(3);
+},{passive:true});
+
+/* ═══ REVEAL ═══ */
+const obs=new IntersectionObserver(entries=>{
+  entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('on')});
+},{threshold:.1});
+document.querySelectorAll('.r').forEach(el=>obs.observe(el));
+
+/* ═══ FLOAT WORDS light-up ═══ */
+const fws=document.querySelectorAll('.fw');
+let fwIdx=0;
+setInterval(()=>{
+  fws.forEach(f=>f.classList.remove('lit'));
+  fws[fwIdx%fws.length].classList.add('lit');
+  fwIdx++;
+},1800);
+</script>
+</body>
+</html>
